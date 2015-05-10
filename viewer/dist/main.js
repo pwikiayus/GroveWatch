@@ -22,16 +22,3 @@ function readInlineReport() {
 async function fetchReport(url) {
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) {
-        throw new Error(`HTTP ${res.status} while fetching ${url}`);
-    }
-    return (await res.json());
-}
-/** Resolves and loads the snapshot from the configured source. */
-export async function loadSnapshot() {
-    const inline = readInlineReport();
-    if (inline)
-        return inline;
-    const params = new URLSearchParams(window.location.search);
-    const url = params.get("report") || DEFAULT_REPORT_URL;
-    return fetchReport(url);
-}
