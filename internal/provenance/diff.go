@@ -86,3 +86,91 @@ func diffFiles(oldFiles, newFiles []FileRecord) []Change {
 		}
 		if of.Digest != nf.Digest {
 			changes = append(changes, Change{
+				Category: FileCategory,
+				Kind:     Modified,
+				Name:     nf.Path,
+				Detail:   fmt.Sprintf("content changed %s -> %s (%d -> %d bytes)", short(of.Digest), short(nf.Digest), of.Size, nf.Size),
+			})
+		} else if of.Mode != nf.Mode {
+			changes = append(changes, Change{
+				Category: FileCategory,
+				Kind:     Modified,
+				Name:     nf.Path,
+				Detail:   fmt.Sprintf("mode changed %s -> %s", of.Mode, nf.Mode),
+			})
+		}
+	}
+	for _, of := range oldFiles {
+		if _, ok := newByPath[of.Path]; !ok {
+			changes = append(changes, Change{
+				Category: FileCategory,
+				Kind:     Removed,
+				Name:     of.Path,
+				Detail:   fmt.Sprintf("file removed (was %d bytes)", of.Size),
+			})
+		}
+	}
+	sortChanges(changes)
+	return changes
+}
+
+func diffTools(oldTools, newTools []ToolRecord) []Change {
+	oldByName := make(map[string]ToolRecord, len(oldTools))
+	for _, t := range oldTools {
+		oldByName[t.Name] = t
+	}
+	newByName := make(map[string]ToolRecord, len(newTools))
+	for _, t := range newTools {
+		newByName[t.Name] = t
+	}
+
+	var changes []Change
+	for _, nt := range newTools {
+		ot, ok := oldByName[nt.Name]
+		if !ok {
+			changes = append(changes, Change{
+				Category: ToolCategory,
+				Kind:     Added,
+				Name:     nt.Name,
+				Detail:   fmt.Sprintf("tool now tracked (found=%v version=%q)", nt.Found, nt.Version),
+			})
+			continue
+		}
+		switch {
+		case ot.Found && !nt.Found:
+			changes = append(changes, Change{
+				Category: ToolCategory, Kind: Removed, Name: nt.Name,
+				Detail: "tool no longer available on PATH",
+			})
+		case !ot.Found && nt.Found:
+			changes = append(changes, Change{
+				Category: ToolCategory, Kind: Added, Name: nt.Name,
+				Detail: fmt.Sprintf("tool became available (version %q)", nt.Version),
+			})
+		case ot.Version != nt.Version:
+			changes = append(changes, Change{
+				Category: ToolCategory, Kind: Modified, Name: nt.Name,
+				Detail: fmt.Sprintf("version changed %q -> %q", ot.Version, nt.Version),
+			})
+		case ot.Path != nt.Path:
+			changes = append(changes, Change{
+				Category: ToolCategory, Kind: Modified, Name: nt.Name,
+				Detail: fmt.Sprintf("path changed %q -> %q", ot.Path, nt.Path),
+			})
+		}
+	}
+	for _, ot := range oldTools {
+		if _, ok := newByName[ot.Name]; !ok {
+			changes = append(changes, Change{
+				Category: ToolCategory, Kind: Removed, Name: ot.Name,
+				Detail: "tool no longer tracked",
+			})
+		}
+	}
+	sortChanges(changes)
+	return changes
+}
+
+func diffEnv(oldEnv, newEnv []EnvRecord) []Change {
+	oldByKey := make(map[string]EnvRecord, len(oldEnv))
+	for _, e := range oldEnv {
