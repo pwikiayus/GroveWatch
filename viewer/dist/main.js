@@ -22,3 +22,28 @@ function readInlineReport() {
 async function fetchReport(url) {
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) {
+        throw new Error(`HTTP ${res.status} while fetching ${url}`);
+    }
+    return (await res.json());
+}
+/** Resolves and loads the snapshot from the configured source. */
+export async function loadSnapshot() {
+    const inline = readInlineReport();
+    if (inline)
+        return inline;
+    const params = new URLSearchParams(window.location.search);
+    const url = params.get("report") || DEFAULT_REPORT_URL;
+    return fetchReport(url);
+}
+/** Boots the viewer against the given mount element. */
+export async function boot(mount) {
+    try {
+        const snap = await loadSnapshot();
+        render(mount, snap);
+    }
+    catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        renderError(mount, message);
+    }
+}
+// Auto-boot when running in a browser with a #app mount point.

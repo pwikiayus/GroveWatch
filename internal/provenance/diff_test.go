@@ -23,29 +23,3 @@ func TestCompareIdentical(t *testing.T) {
 	b := mkSnap(files, nil, nil)
 	d := Compare(a, b)
 	if !d.Identical {
-		t.Fatalf("expected identical, got changes: %+v", d.Changes)
-	}
-	if len(d.Changes) != 0 {
-		t.Fatalf("expected no changes, got %d", len(d.Changes))
-	}
-}
-
-func TestCompareFileDrift(t *testing.T) {
-	oldSnap := mkSnap([]FileRecord{
-		{Path: "keep.txt", Size: 1, Mode: "0644", Digest: "k1"},
-		{Path: "changed.txt", Size: 2, Mode: "0644", Digest: "c1"},
-		{Path: "gone.txt", Size: 3, Mode: "0644", Digest: "g1"},
-	}, nil, nil)
-	newSnap := mkSnap([]FileRecord{
-		{Path: "keep.txt", Size: 1, Mode: "0644", Digest: "k1"},
-		{Path: "changed.txt", Size: 5, Mode: "0644", Digest: "c2"},
-		{Path: "added.txt", Size: 9, Mode: "0644", Digest: "a1"},
-	}, nil, nil)
-
-	d := Compare(oldSnap, newSnap)
-	if d.Identical {
-		t.Fatal("expected drift")
-	}
-
-	got := map[string]ChangeKind{}
-	for _, c := range d.Changes {
