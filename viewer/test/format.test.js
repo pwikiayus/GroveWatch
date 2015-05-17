@@ -17,3 +17,41 @@ import {
   formatTimestamp,
   shortDigest,
 } from "../dist/format.js";
+
+test("formatBytes scales units", () => {
+  assert.equal(formatBytes(0), "0 B");
+  assert.equal(formatBytes(512), "512 B");
+  assert.equal(formatBytes(1024), "1.0 KB");
+  assert.equal(formatBytes(1536), "1.5 KB");
+  assert.equal(formatBytes(1048576), "1.0 MB");
+  assert.equal(formatBytes(-1), "—");
+});
+
+test("shortDigest truncates", () => {
+  assert.equal(shortDigest("abcdef0123456789", 8), "abcdef01");
+  assert.equal(shortDigest("abc", 8), "abc");
+  assert.equal(shortDigest(""), "—");
+});
+
+test("formatTimestamp handles bad input", () => {
+  assert.equal(formatTimestamp("not-a-date"), "not-a-date");
+  const out = formatTimestamp("2026-01-02T03:04:05.678Z");
+  assert.match(out, /2026-01-02 03:04:05/);
+});
+
+test("buildTree nests paths and sorts dirs first", () => {
+  const tree = buildTree([
+    { path: "src/main.go", size: 100, mode: "0644", digest: "d1" },
+    { path: "README.md", size: 50, mode: "0644", digest: "d2" },
+    { path: "src/util/helper.go", size: 25, mode: "0644", digest: "d3" },
+  ]);
+
+  // Directory ("src") should sort before file ("README.md").
+  assert.equal(tree.children[0].name, "src");
+  assert.equal(tree.children[0].isDir, true);
+  assert.equal(tree.children[1].name, "README.md");
+
+  // Directory size rolls up its descendants (100 + 25 = 125).
+  assert.equal(tree.children[0].size, 125);
+
+  // Nested directory is synthesized.
