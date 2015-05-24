@@ -75,29 +75,3 @@ func TestCompareToolAndEnvDrift(t *testing.T) {
 		[]EnvRecord{{Key: "CI", Set: true, ValueDigest: "x1"}},
 	)
 	newSnap := mkSnap(nil,
-		[]ToolRecord{{Name: "go", Found: true, Version: "1.25"}},
-		[]EnvRecord{{Key: "CI", Set: true, ValueDigest: "x2"}},
-	)
-	d := Compare(oldSnap, newSnap)
-
-	var sawTool, sawEnv bool
-	for _, c := range d.Changes {
-		if c.Category == ToolCategory && c.Name == "go" && c.Kind == Modified {
-			sawTool = true
-		}
-		if c.Category == EnvCategory && c.Name == "CI" && c.Kind == Modified {
-			sawEnv = true
-		}
-	}
-	if !sawTool {
-		t.Error("expected go version drift")
-	}
-	if !sawEnv {
-		t.Error("expected CI env drift")
-	}
-}
-
-func TestMarshalRoundTrip(t *testing.T) {
-	snap := mkSnap(
-		[]FileRecord{{Path: "a.txt", Size: 1, Mode: "0644", Digest: "aa"}},
-		[]ToolRecord{{Name: "go", Found: true, Version: "1.24"}},
