@@ -30,36 +30,3 @@ func Unmarshal(data []byte) (*Snapshot, error) {
 	return &snap, nil
 }
 
-// Read parses a snapshot from an io.Reader.
-func Read(r io.Reader) (*Snapshot, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("read snapshot: %w", err)
-	}
-	return Unmarshal(data)
-}
-
-// canonicalView is a projection of a snapshot that excludes volatile fields
-// (CreatedAt and the Digest itself). Hashing this view yields the stable
-// identity used as Snapshot.Digest.
-type canonicalView struct {
-	Schema      string        `json:"schema"`
-	Tool        ToolInfo      `json:"tool"`
-	Workspace   WorkspaceInfo `json:"workspace"`
-	Files       []FileRecord  `json:"files"`
-	Tools       []ToolRecord  `json:"tools"`
-	Environment []EnvRecord   `json:"environment"`
-}
-
-// ComputeDigest returns the canonical SHA-256 identity of a snapshot. It is
-// stable across runs with identical inputs because it excludes CreatedAt and
-// the previously computed Digest.
-func ComputeDigest(snap *Snapshot) string {
-	view := canonicalView{
-		Schema:      snap.Schema,
-		Tool:        snap.Tool,
-		Workspace:   snap.Workspace,
-		Files:       snap.Files,
-		Tools:       snap.Tools,
-		Environment: snap.Environment,
-	}

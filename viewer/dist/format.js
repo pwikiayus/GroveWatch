@@ -17,23 +17,3 @@ export function formatBytes(bytes) {
     }
     return `${value.toFixed(1)} ${units[unit]}`;
 }
-/** Returns the first `n` characters of a hex digest for compact display. */
-export function shortDigest(digest, n = 12) {
-    if (!digest)
-        return "—";
-    return digest.length <= n ? digest : digest.slice(0, n);
-}
-/** Formats an ISO timestamp into a locale string, tolerating bad input. */
-export function formatTimestamp(iso) {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime()))
-        return iso || "—";
-    return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
-}
-/**
- * Builds a nested tree from the flat, slash-separated file paths in a snapshot.
- * Directories are synthesized as needed and children are returned sorted with
- * directories first, then files, both alphabetically.
- */
-export function buildTree(files) {
-    const root = {
