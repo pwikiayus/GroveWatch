@@ -50,29 +50,3 @@ function renderSection(title, body) {
 function renderFileTree(snap) {
     const tree = buildTree(snap.files);
     const list = el("ul", "gw-tree");
-    for (const child of tree.children) {
-        list.append(renderTreeNode(child));
-    }
-    if (tree.children.length === 0) {
-        list.append(el("li", "gw-empty", "no files recorded"));
-    }
-    return list;
-}
-function renderTreeNode(node) {
-    const li = el("li", node.isDir ? "gw-node gw-dir" : "gw-node gw-file");
-    const row = el("div", "gw-row");
-    row.append(el("span", "gw-icon", node.isDir ? "▸" : "·"));
-    row.append(el("span", "gw-name", node.name));
-    row.append(el("span", "gw-size", formatBytes(node.size)));
-    if (!node.isDir && node.digest) {
-        const code = el("code", "gw-mono gw-hash", shortDigest(node.digest));
-        code.title = node.digest;
-        row.append(code);
-    }
-    li.append(row);
-    if (node.isDir && node.children.length > 0) {
-        const sub = el("ul", "gw-tree");
-        for (const child of node.children)
-            sub.append(renderTreeNode(child));
-        li.append(sub);
-    }
