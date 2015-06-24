@@ -24,29 +24,3 @@ function renderHeader(snap) {
     digest.append(el("span", "gw-label", "digest "), el("code", "gw-mono", snap.digest));
     header.append(digest);
     header.append(el("p", "gw-time", `captured ${formatTimestamp(snap.created_at)}`));
-    return header;
-}
-function renderStats(snap) {
-    const grid = el("div", "gw-stats");
-    const stats = [
-        ["Files", String(snap.workspace.file_count)],
-        ["Total size", formatBytes(snap.workspace.total_bytes)],
-        ["Tools found", `${countFoundTools(snap)} / ${snap.tools.length}`],
-        ["Env set", `${countSetEnv(snap)} / ${snap.environment.length}`],
-        ["Merkle root", shortDigest(snap.workspace.merkle_root)],
-    ];
-    for (const [label, value] of stats) {
-        const card = el("div", "gw-stat");
-        card.append(el("div", "gw-stat-value", value), el("div", "gw-stat-label", label));
-        grid.append(card);
-    }
-    return grid;
-}
-function renderSection(title, body) {
-    const section = el("section", "gw-section");
-    section.append(el("h2", "gw-section-title", title), body);
-    return section;
-}
-function renderFileTree(snap) {
-    const tree = buildTree(snap.files);
-    const list = el("ul", "gw-tree");
