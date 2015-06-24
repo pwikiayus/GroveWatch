@@ -4,9 +4,3 @@
 *.test
 *.out
 
-# grovewatch snapshots produced by local runs (the curated sample is tracked)
-/examples/report/*.local.json
-
-# TypeScript / viewer
-/viewer/dist/
-/viewer/node_modules/
