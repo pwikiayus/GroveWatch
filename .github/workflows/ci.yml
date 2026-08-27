@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  go:
+    name: Go (build, vet, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test ./...
+      - name: Build
+        run: go build -ldflags "-X main.version=ci" -o bin/grovewatch ./cmd/grovewatch
+      - name: Verify sample report integrity
+        run: ./bin/grovewatch verify examples/report/provenance.json
+
+  viewer:
+    name: Viewer (typecheck, test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: viewer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install TypeScript
+        run: npm install --no-save typescript@5.8
+      - name: Type-check
+        run: npx tsc -p tsconfig.json --noEmit
+      - name: Build
+        run: npx tsc -p tsconfig.json
+      - name: Test
+        run: node --test
