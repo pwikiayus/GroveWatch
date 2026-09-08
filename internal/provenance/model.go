@@ -44,3 +44,50 @@ type ToolInfo struct {
 
 // WorkspaceInfo holds aggregate information about the scanned root.
 type WorkspaceInfo struct {
+	// Root is the workspace path as supplied on the command line.
+	Root string `json:"root"`
+	// FileCount is the number of recorded files.
+	FileCount int `json:"file_count"`
+	// TotalBytes is the sum of recorded file sizes.
+	TotalBytes int64 `json:"total_bytes"`
+	// MerkleRoot is a hash over all file digests, giving a single value that
+	// changes if any file content changes.
+	MerkleRoot string `json:"merkle_root"`
+}
+
+// FileRecord is the provenance of a single file input.
+type FileRecord struct {
+	// Path is the slash-separated path relative to the workspace root.
+	Path string `json:"path"`
+	// Size is the file size in bytes.
+	Size int64 `json:"size"`
+	// Mode is the octal file mode string (e.g. "0644").
+	Mode string `json:"mode"`
+	// Digest is the SHA-256 of the file contents, hex-encoded.
+	Digest string `json:"digest"`
+}
+
+// ToolRecord is the provenance of an external toolchain input, e.g. a compiler
+// or interpreter discovered on PATH.
+type ToolRecord struct {
+	// Name is the logical tool name (e.g. "go", "node").
+	Name string `json:"name"`
+	// Path is the resolved absolute path, or empty if not found.
+	Path string `json:"path"`
+	// Version is the reported version string, or empty if unavailable.
+	Version string `json:"version"`
+	// Found indicates whether the tool was located on the host.
+	Found bool `json:"found"`
+}
+
+// EnvRecord is the provenance of a single environment variable input. Values
+// are hashed rather than stored verbatim to avoid leaking secrets while still
+// detecting change.
+type EnvRecord struct {
+	// Key is the environment variable name.
+	Key string `json:"key"`
+	// ValueDigest is the SHA-256 of the value, hex-encoded, or empty if unset.
+	ValueDigest string `json:"value_digest"`
+	// Set indicates whether the variable was present in the environment.
+	Set bool `json:"set"`
+}
