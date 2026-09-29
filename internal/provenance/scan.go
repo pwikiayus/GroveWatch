@@ -105,3 +105,111 @@ func scanFiles(root string, ignore []string) ([]FileRecord, error) {
 		if err != nil {
 			return err
 		}
+		rel = filepath.ToSlash(rel)
+		if rel == "." {
+			return nil
+		}
+		if isIgnored(rel, ignore) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		fi, err := d.Info()
+		if err != nil {
+			return err
+		}
+		if !fi.Mode().IsRegular() {
+			// Skip symlinks, sockets, devices: their content is not portable.
+			return nil
+		}
+		digest, err := hashFile(path)
+		if err != nil {
+			return err
+		}
+		records = append(records, FileRecord{
+			Path:   rel,
+			Size:   fi.Size(),
+			Mode:   fmt.Sprintf("%#o", fi.Mode().Perm()),
+			Digest: digest,
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scan files: %w", err)
+	}
+
+	sort.Slice(records, func(i, j int) bool { return records[i].Path < records[j].Path })
+	return records, nil
+}
+
+// isIgnored reports whether rel matches any ignore fragment on a path segment
+// boundary.
+func isIgnored(rel string, ignore []string) bool {
+	segments := strings.Split(rel, "/")
+	for _, frag := range ignore {
+		if frag == "" {
+			continue
+		}
+		for _, seg := range segments {
+			if seg == frag {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// scanTools probes each named tool on PATH and records its resolved path and
+// reported version. Results are sorted by name.
+func scanTools(names []string) []ToolRecord {
+	records := make([]ToolRecord, 0, len(names))
+	for _, name := range names {
+		rec := ToolRecord{Name: name}
+		path, err := exec.LookPath(name)
+		if err == nil {
+			rec.Path = filepath.ToSlash(path)
+			rec.Found = true
+			rec.Version = probeVersion(name)
+		}
+		records = append(records, rec)
+	}
+	sort.Slice(records, func(i, j int) bool { return records[i].Name < records[j].Name })
+	return records
+}
+
+// probeVersion runs "<tool> --version" (falling back to "version") and returns
+// the first dotted version number found, or "" if none.
+func probeVersion(name string) string {
+	for _, args := range [][]string{{"--version"}, {"version"}, {"-version"}} {
+		cmd := exec.Command(name, args...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			continue
+		}
+		if m := versionRe.Find(out); m != nil {
+			return string(m)
+		}
+	}
+	return ""
+}
+
+// scanEnv records the presence and value hash of each named environment
+// variable. Values are hashed to avoid persisting secrets. Results are sorted
+// by key.
+func scanEnv(keys []string) []EnvRecord {
+	records := make([]EnvRecord, 0, len(keys))
+	for _, key := range keys {
+		val, ok := os.LookupEnv(key)
+		rec := EnvRecord{Key: key, Set: ok}
+		if ok {
+			rec.ValueDigest = hashBytes([]byte(val))
+		}
+		records = append(records, rec)
+	}
+	sort.Slice(records, func(i, j int) bool { return records[i].Key < records[j].Key })
+	return records
+}
