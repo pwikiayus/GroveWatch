@@ -35,3 +35,77 @@ func fixedNow() time.Time {
 }
 
 func TestScanRecordsFilesAndIgnores(t *testing.T) {
+	root := writeTree(t)
+	snap, err := Scan(ScanConfig{
+		Root:        root,
+		ToolVersion: "test",
+		Ignore:      []string{"node_modules"},
+		Now:         fixedNow,
+	})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+
+	if snap.Workspace.FileCount != 3 {
+		t.Fatalf("expected 3 files, got %d: %+v", snap.Workspace.FileCount, snap.Files)
+	}
+	// Files must be sorted by path.
+	want := []string{"README.md", "src/main.go", "src/util/helper.go"}
+	for i, w := range want {
+		if snap.Files[i].Path != w {
+			t.Errorf("file[%d] = %q, want %q", i, snap.Files[i].Path, w)
+		}
+	}
+	// Ignored file must not appear.
+	for _, f := range snap.Files {
+		if f.Path == "node_modules/dep.js" {
+			t.Errorf("ignored file was recorded: %s", f.Path)
+		}
+	}
+}
+
+func TestScanDeterministicDigest(t *testing.T) {
+	root := writeTree(t)
+	cfg := ScanConfig{Root: root, ToolVersion: "test", Ignore: []string{"node_modules"}, Now: fixedNow}
+
+	a, err := Scan(cfg)
+	if err != nil {
+		t.Fatalf("scan a: %v", err)
+	}
+	b, err := Scan(cfg)
+	if err != nil {
+		t.Fatalf("scan b: %v", err)
+	}
+	if a.Digest != b.Digest {
+		t.Fatalf("digest not stable: %s != %s", a.Digest, b.Digest)
+	}
+	if a.Workspace.MerkleRoot != b.Workspace.MerkleRoot {
+		t.Fatalf("merkle root not stable")
+	}
+	if !Verify(a) {
+		t.Fatalf("scanned snapshot failed self-verification")
+	}
+}
+
+func TestScanDigestExcludesTimestamp(t *testing.T) {
+	root := writeTree(t)
+	base := ScanConfig{Root: root, ToolVersion: "test", Ignore: []string{"node_modules"}}
+
+	base.Now = func() time.Time { return time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC) }
+	a, _ := Scan(base)
+	base.Now = func() time.Time { return time.Date(2030, 6, 15, 12, 0, 0, 0, time.UTC) }
+	b, _ := Scan(base)
+
+	if a.Digest != b.Digest {
+		t.Fatalf("digest changed with timestamp: %s != %s", a.Digest, b.Digest)
+	}
+	if a.CreatedAt.Equal(b.CreatedAt) {
+		t.Fatalf("expected different CreatedAt values")
+	}
+}
+
+func TestScanRejectsNonDirectory(t *testing.T) {
+	if _, err := Scan(ScanConfig{Root: "", ToolVersion: "t"}); err == nil {
+		t.Fatal("expected error for empty root")
+	}
+}
