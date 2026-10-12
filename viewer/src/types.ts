@@ -27,3 +27,32 @@ export interface ToolRecord {
   name: string;
   path: string;
   version: string;
+  found: boolean;
+}
+
+export interface EnvRecord {
+  key: string;
+  value_digest: string;
+  set: boolean;
+}
+
+export interface Snapshot {
+  schema: string;
+  tool: ToolInfo;
+  workspace: WorkspaceInfo;
+  files: FileRecord[];
+  tools: ToolRecord[];
+  environment: EnvRecord[];
+  digest: string;
+  created_at: string;
+}
+
+/** A single node in the derived file tree used for rendering. */
+export interface TreeNode {
+  name: string;
+  path: string;
+  isDir: boolean;
+  size: number;
+  digest?: string;
+  children: TreeNode[];
+}
