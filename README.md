@@ -221,3 +221,227 @@ grovewatch version                      Print the version
 
 **`diff` flag** — `-json` emits the diff as structured JSON instead of text.
 
+**Exit codes** — `0` success / no drift · `1` I/O or parse error · `2` usage
+error · `3` `diff` found drift · `4` `verify` digest mismatch. Codes `3` and `4`
+are the ones you wire into CI gates.
+
+---
+
+## The snapshot schema, field by field
+
+A snapshot is a single JSON object. Abridged from the bundled sample:
+
+```json
+{
+  "schema": "1.0.0",
+  "tool": { "name": "grovewatch", "version": "0.1.0" },
+  "workspace": { "root": "examples/sample-workspace", "file_count": 4,
+                 "total_bytes": 825, "merkle_root": "5be5329bef2c…247e" },
+  "files":       [ { "path": "README.md", "size": 298, "mode": "0666", "digest": "45fef498…0f95" } ],
+  "tools":       [ { "name": "go", "path": "…/go.exe", "version": "1.24.4", "found": true } ],
+  "environment": [ { "key": "CI", "value_digest": "", "set": false } ],
+  "digest": "b8afd4eb68c2…689d",
+  "created_at": "2026-08-31T16:17:09Z"
+}
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `schema` | SemVer | Currently `1.0.0`; gate on the major version |
+| `tool` | `{name, version}` | Producer identity |
+| `workspace` | object | `root`, `file_count`, `total_bytes`, `merkle_root` (hex) |
+| `files[]` | `{path, size, mode, digest}` | Sorted by path; `path` always uses `/` |
+| `tools[]` | `{name, path, version, found}` | Sorted by name |
+| `environment[]` | `{key, value_digest, set}` | Sorted by key; value never stored |
+| `digest` | hex | Canonical identity (excludes `created_at` and itself) |
+| `created_at` | RFC 3339 UTC | **Volatile** — excluded from the digest |
+
+Paths are normalised to forward slashes even on Windows, so a snapshot from one
+OS is comparable to one from another.
+
+---
+
+## Reading a drift report
+
+Every text-mode change line has one shape — `[<category>/<kind>] <name>: <detail>`
+— where **category** is `file`/`tool`/`env`, **kind** is `added` (new only),
+`removed` (old only), or `modified` (in both, content differs), and **detail** is
+a human sentence (byte-size deltas for files, `version changed …` for tools,
+`value changed …` for env).
+
+A **file** counts as modified when its content digest differs (or, same content,
+its octal mode differs); a **tool** when its version differs, availability flips,
+or resolved path differs; an **env** var when its value's SHA-256 differs or the
+`set` flag flips. For machines, `grovewatch diff -json` emits the same data as a
+structured object (`old_digest`, `new_digest`, `identical`, `changes[]`), still
+exiting `3` on drift.
+
+---
+
+## The viewer
+
+The viewer is plain TypeScript compiled to ES modules — **no framework, no
+bundler, no runtime dependency.** It resolves its report in order: (1) a
+`?report=<url>` query parameter; (2) an inline
+`<script id="gw-report" type="application/json">` block (how it works straight
+from `file://`, no server needed); (3) otherwise `./provenance.json` relative to
+the page.
+
+It then renders summary stat cards, a nested **file tree** with directory size
+roll-ups, a **toolchain** table, and an **environment** table. Every
+user-controlled string is written through `textContent` — **never** `innerHTML`
+— so a hostile snapshot cannot inject markup. The pure logic (byte formatting,
+digest truncation, timestamp handling, tree building) lives in
+`viewer/src/format.ts` and is unit-tested with Node's built-in `node:test`.
+
+```sh
+make viewer-build         # compile viewer/src → viewer/dist
+node scripts/serve.mjs    # tiny stdlib static server on :8080
+# then open http://localhost:8080/viewer/public/index.html
+```
+
+The shipped `viewer/public/index.html` also opens straight from disk — it carries
+an inline copy of the sample report.
+
+---
+
+## Use cases
+
+- **Reproducible-build gate** — baseline a known-good environment; fail CI when
+  inputs drift (exit `3`).
+- **Supply-chain audit** — keep signed-off snapshots of what an artifact was
+  built from, and diff releases to explain which inputs moved.
+- **Toolchain drift detection** — catch a runner silently upgrading `go` or
+  `node` under you.
+- **Config integrity** — detect an unexpected edit or removal of a config file
+  without diffing whole trees by hand.
+- **Tamper alarm** — ship the snapshot with a release so anyone can `verify` the
+  record was not altered.
+
+---
+
+## Recipes
+
+**Fail a pipeline on any input drift** — `diff` exits `3` on drift, so CI fails:
+
+```sh
+grovewatch scan -out current.json .
+grovewatch diff baseline.json current.json
+```
+
+**Track a specific toolchain and secret set** — secrets are stored only as
+`set` + a value hash, never verbatim:
+
+```sh
+grovewatch scan -tools go,node,rustc,docker \
+  -env CI,NODE_ENV,DATABASE_URL,AWS_REGION -out snap.json .
+```
+
+Also: **ignore generated dirs** with `-ignore .git,node_modules,dist,build,target,coverage`;
+**refresh & re-verify** the sample with `make report` then `make verify`;
+**machine-readable drift** via `grovewatch diff -json baseline.json current.json > drift.json`.
+
+---
+
+## Trust boundary & threat model
+
+grovewatch is honest about what its guarantees mean.
+
+- **The digest proves the *snapshot* is intact, not the *world*.** `verify`
+  detects edits to the JSON after it was written; it cannot tell that the
+  workspace was already compromised at scan time — garbage in, sealed garbage out.
+- **Env values are hashed, not encrypted.** A value's SHA-256 detects change and
+  confirms equality without revealing the secret, but it does not hide *which
+  keys* you track and a guessed value can be confirmed. Change-detector, not vault.
+- **Tools are trusted to report their own version.** grovewatch records whatever
+  `<tool> --version` prints; a malicious binary on `PATH` can lie.
+- **No network, no execution beyond version probes**, no telemetry — nothing
+  leaves the host.
+- **Integrity, not authenticity.** The digest is not a signature; to prove *who*
+  produced a snapshot, sign the file with your own key on top of grovewatch.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause & fix |
+|---------|--------------------|
+| `verify` prints `MISMATCH` | JSON edited after scanning, or an incompatible schema major. Re-scan to regenerate. |
+| Tool shows `found: false` | Not on the `PATH` grovewatch inherited. Check the shell/CI env, or drop it from `-tools`. |
+| `version` empty but `found: true` | The binary prints no dotted version to `--version`/`version`/`-version`. Path is still recorded. |
+| Digest differs across machines for "identical" inputs | Something in the roots really differs — often file **mode** bits or a tool version. Run `diff` to see. |
+| `diff` exits non-zero in CI | By design: exit `3` means drift was found — a gate signal, not a crash. |
+| Viewer shows "Failed to load report" | Could not resolve a report from `?report=`, the inline block, or `./provenance.json`. Serve the folder or use the inline build. |
+
+---
+
+## Repository layout
+
+```
+grovewatch/
+├─ cmd/grovewatch/main.go     CLI entry point & subcommands
+├─ internal/provenance/       core library (stdlib only)
+│  ├─ model.go                snapshot data model + schema version
+│  ├─ scan.go                 workspace / tool / env scanner
+│  ├─ digest.go               SHA-256 helpers + Merkle root
+│  ├─ serialize.go            deterministic JSON, ComputeDigest, Verify
+│  ├─ diff.go                 drift comparison engine + Summary()
+│  └─ *_test.go               focused tests
+├─ viewer/                    zero-dep TypeScript viewer (src · test · public)
+├─ examples/                  sample-workspace/ + report/provenance.json
+├─ docs/                      PROVENANCE.md spec + assets/ (this guide's SVGs)
+├─ scripts/serve.mjs          tiny stdlib static server
+└─ Makefile · .github/workflows/ci.yml · LICENSE · CHANGELOG.md
+```
+
+---
+
+## Testing
+
+```sh
+make test          # Go tests: scan determinism, diff classification, verify
+make viewer-test   # viewer tests: byte formatting, digest truncation, tree build
+make ci            # vet + Go tests + viewer build/test + verify sample
+```
+
+The Go tests assert that identical inputs yield an identical digest, that the
+digest is independent of capture time, that drift is classified into the right
+category and kind, and that tampering is detected. The viewer tests cover byte
+formatting, digest truncation, timestamp handling, and tree construction.---
+
+## Limitations
+
+- **Inputs, not process** — grovewatch fingerprints files, tools, and env keys;
+  it does not trace what a build *does* (no syscall/eBPF instrumentation).
+- **Regular files only** — symlinks, devices, and sockets are skipped; empty
+  directories leave no trace, since directories are implied by file paths.
+- **Version parsing is heuristic** — the first dotted number from `--version` is
+  not always the semantic tool version.
+- **Whole-file granularity** — `diff` reports that a file changed and its size
+  delta, not a line-level content diff.
+- **Digest ≠ signature** — integrity is guaranteed, authenticity is not; sign the
+  snapshot separately if you need it.
+
+---
+
+## Roadmap
+
+Directional, not committed (current release `0.1.0`): optional detached signing
+(minisign / cosign) for authenticity atop integrity; a `-format` flag for compact
+single-line JSON; glob-based ignore patterns; a browser side-by-side diff of two
+snapshots; optional file-timestamp recording behind an explicit flag.
+
+---
+
+## Further reading
+
+- **[docs/PROVENANCE.md](docs/PROVENANCE.md)** — the data model and digest algorithm in full
+- **[CHANGELOG.md](CHANGELOG.md)** — release history · **[LICENSE](LICENSE)** — MIT
+- **[examples/report/provenance.json](examples/report/provenance.json)** — the verified sample snapshot
+
+---
+
+<p align="center">
+  <em>Built with the Go standard library and dependency-free TypeScript.<br>
+  Roots to canopy, nothing leaves the grove.</em>
+</p>
