@@ -49,3 +49,55 @@ export function buildTree(files: FileRecord[]): TreeNode {
   for (const file of files) {
     const parts = file.path.split("/").filter((p) => p.length > 0);
     let node = root;
+    let accum = "";
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      accum = accum ? `${accum}/${part}` : part;
+      const isLeaf = i === parts.length - 1;
+      let child = node.children.find((c) => c.name === part);
+      if (!child) {
+        child = {
+          name: part,
+          path: accum,
+          isDir: !isLeaf,
+          size: isLeaf ? file.size : 0,
+          digest: isLeaf ? file.digest : undefined,
+          children: [],
+        };
+        node.children.push(child);
+      }
+      node = child;
+    }
+  }
+
+  sortTree(root);
+  computeDirSizes(root);
+  return root;
+}
+
+function sortTree(node: TreeNode): void {
+  node.children.sort((a, b) => {
+    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+  for (const child of node.children) sortTree(child);
+}
+
+/** Rolls up leaf sizes into directory nodes and returns the node's total. */
+function computeDirSizes(node: TreeNode): number {
+  if (!node.isDir) return node.size;
+  let total = 0;
+  for (const child of node.children) total += computeDirSizes(child);
+  node.size = total;
+  return total;
+}
+
+/** Counts how many probed tools were found on the host. */
+export function countFoundTools(snap: Snapshot): number {
+  return snap.tools.filter((t) => t.found).length;
+}
+
+/** Counts how many tracked environment variables were set. */
+export function countSetEnv(snap: Snapshot): number {
+  return snap.environment.filter((e) => e.set).length;
+}
