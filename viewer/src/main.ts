@@ -31,3 +31,37 @@ async function fetchReport(url: string): Promise<Snapshot> {
   }
   return (await res.json()) as Snapshot;
 }
+
+/** Resolves and loads the snapshot from the configured source. */
+export async function loadSnapshot(): Promise<Snapshot> {
+  const inline = readInlineReport();
+  if (inline) return inline;
+
+  const params = new URLSearchParams(window.location.search);
+  const url = params.get("report") || DEFAULT_REPORT_URL;
+  return fetchReport(url);
+}
+
+/** Boots the viewer against the given mount element. */
+export async function boot(mount: HTMLElement): Promise<void> {
+  try {
+    const snap = await loadSnapshot();
+    render(mount, snap);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    renderError(mount, message);
+  }
+}
+
+// Auto-boot when running in a browser with a #app mount point.
+if (typeof document !== "undefined") {
+  const start = () => {
+    const mount = document.getElementById("app");
+    if (mount) void boot(mount);
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start);
+  } else {
+    start();
+  }
+}

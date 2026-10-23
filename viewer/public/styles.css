@@ -70,3 +70,149 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 0.75rem;
   margin-bottom: 2rem;
+}
+
+.gw-stat {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+}
+
+.gw-stat-value {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--accent);
+  font-family: var(--mono);
+}
+
+.gw-stat-label {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.gw-section {
+  margin-bottom: 2rem;
+}
+
+.gw-section-title {
+  font-size: 1.1rem;
+  border-left: 3px solid var(--accent);
+  padding-left: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.gw-tree {
+  list-style: none;
+  margin: 0;
+  padding-left: 1rem;
+}
+
+.gw-tree .gw-tree {
+  border-left: 1px dashed var(--border);
+}
+
+.gw-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 5px;
+}
+
+.gw-row:hover {
+  background: var(--panel);
+}
+
+.gw-icon {
+  color: var(--muted);
+  width: 1rem;
+  text-align: center;
+}
+
+.gw-dir > .gw-row .gw-name {
+  font-weight: 600;
+}
+
+.gw-name {
+  flex: 1;
+}
+
+.gw-size {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-family: var(--mono);
+}
+
+.gw-hash {
+  color: var(--accent);
+}
+
+.gw-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.gw-table th,
+.gw-table td {
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.gw-table th {
+  background: var(--panel-2);
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+}
+
+.gw-table tr:last-child td {
+  border-bottom: none;
+}
+
+.gw-path {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  word-break: break-all;
+}
+
+.gw-badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.gw-ok {
+  background: rgba(63, 185, 80, 0.15);
+  color: var(--ok);
+}
+
+.gw-miss {
+  background: rgba(248, 81, 73, 0.15);
+  color: var(--miss);
+}
+
+.gw-empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.gw-error {
+  background: rgba(248, 81, 73, 0.12);
+  border: 1px solid var(--miss);
+  color: var(--fg);
+  padding: 1rem;
+  border-radius: 8px;
+}
